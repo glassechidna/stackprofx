@@ -32,12 +32,3 @@ profile = StackProf.run(:cpu, 1000) do
   end
 end
 
-result = StackProf::Report.new(profile)
-puts
-result.print_source(/pow|newobj|math/)
-puts
-result.print_text
-puts
-result.print_graphviz
-puts
-result.print_debug
