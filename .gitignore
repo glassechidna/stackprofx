@@ -1,3 +1,4 @@
 /tmp
-/lib/stackprof.bundle
-/lib/stackprof.so
+/lib/stackprofx.bundle
+/lib/stackprofx.so
+.idea

@@ -4,7 +4,7 @@ task :default => :test
 # Packaging
 # ==========================================================
 
-GEMSPEC = Gem::Specification::load('stackprof.gemspec')
+GEMSPEC = Gem::Specification::load('stackprofx.gemspec')
 
 require 'rubygems/package_task'
 Gem::PackageTask.new(GEMSPEC) do |pkg|
@@ -15,7 +15,7 @@ end
 # ==========================================================
 
 require 'rake/extensiontask'
-Rake::ExtensionTask.new('stackprof', GEMSPEC) do |ext|
+Rake::ExtensionTask.new('stackprofx', GEMSPEC) do |ext|
   ext.ext_dir = 'ext'
 end
 task :build => :compile

@@ -1,5 +1,5 @@
 $:.unshift File.expand_path('../lib', __FILE__)
-require 'stackprof'
+require 'stackprofx'
 
 class A
   def initialize
@@ -24,9 +24,9 @@ class A
   end
 end
 
-#profile = StackProf.run(:object, 1) do
-#profile = StackProf.run(:wall, 1000) do
-profile = StackProf.run(:cpu, 1000) do
+#profile = StackProfx.run(:object, 1) do
+#profile = StackProfx.run(:wall, 1000) do
+profile = StackProfx.run(:cpu, 1000) do
   1_000_000.times do
     A.new
   end

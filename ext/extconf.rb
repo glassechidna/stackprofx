@@ -5,7 +5,7 @@ if have_func('rb_postponed_job_register_one') &&
    have_const('RUBY_INTERNAL_EVENT_NEWOBJ')
 
   $CFLAGS += " -I../../../../ext/ruby_headers/215"
-  create_makefile('stackprof')
+  create_makefile('stackprofx')
 else
   fail 'missing API: are you using ruby 2.1+?'
 end
