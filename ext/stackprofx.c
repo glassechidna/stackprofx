@@ -62,11 +62,13 @@ static struct {
     size_t during_gc;
     st_table *frames;
 
+    st_table *threads;
+
     VALUE frames_buffer[BUF_SIZE];
     int lines_buffer[BUF_SIZE];
 } _stackprofx;
 
-static VALUE sym_object, sym_wall, sym_cpu, sym_custom, sym_name, sym_file, sym_line;
+static VALUE sym_object, sym_wall, sym_cpu, sym_custom, sym_name, sym_file, sym_line, sym_threads;
 static VALUE sym_samples, sym_total_samples, sym_missed_samples, sym_edges, sym_lines;
 static VALUE sym_version, sym_mode, sym_interval, sym_raw, sym_frames, sym_out, sym_aggregate;
 static VALUE sym_gc_samples, objtracer;
@@ -81,7 +83,7 @@ stackprofx_start(int argc, VALUE *argv, VALUE self)
 {
     struct sigaction sa;
     struct itimerval timer;
-    VALUE opts = Qnil, mode = Qnil, interval = Qnil, out = Qfalse;
+    VALUE opts = Qnil, mode = Qnil, interval = Qnil, out = Qfalse, threads = Qnil;
     int raw = 0, aggregate = 1;
 
     if (_stackprofx.running)
@@ -93,6 +95,7 @@ stackprofx_start(int argc, VALUE *argv, VALUE self)
 	mode = rb_hash_aref(opts, sym_mode);
 	interval = rb_hash_aref(opts, sym_interval);
 	out = rb_hash_aref(opts, sym_out);
+	threads = rb_hash_aref(opts, sym_threads);
 
 	if (RTEST(rb_hash_aref(opts, sym_raw)))
 	    raw = 1;
@@ -100,6 +103,21 @@ stackprofx_start(int argc, VALUE *argv, VALUE self)
 	    aggregate = 0;
     }
     if (!RTEST(mode)) mode = sym_wall;
+
+  if (RTEST(threads))
+  {
+    _stackprofx.threads = st_init_numtable();
+    for (int i = 0; i < RARRAY_LEN(threads); i++)
+    {
+        VALUE thr = rb_ary_entry(threads, i);
+        st_add_direct(_stackprofx.threads, thr, 0);
+        rb_gc_mark(thr);
+    }
+  }
+  else
+  {
+      _stackprofx.threads = 0;
+  }
 
     if (!_stackprofx.frames) {
 	_stackprofx.frames = st_init_numtable();
@@ -151,6 +169,8 @@ stackprofx_stop(VALUE self)
     if (!_stackprofx.running)
 	return Qfalse;
     _stackprofx.running = 0;
+
+    st_free_table(_stackprofx.threads);
 
     if (_stackprofx.mode == sym_object) {
 	rb_tracepoint_disable(objtracer);
@@ -391,6 +411,7 @@ stackprofx_record_sample_i(st_data_t key, st_data_t val, st_data_t arg)
 
     rb_thread_t *th;
     GetThreadPtr((VALUE)key, th);
+    if (th->status == THREAD_KILLED) return ST_CONTINUE;
 
     num = rb_profile_frames_thread(0, sizeof(_stackprofx.frames_buffer) / sizeof(VALUE), _stackprofx.frames_buffer, _stackprofx.lines_buffer, th);
 
@@ -463,7 +484,8 @@ void
 stackprofx_record_sample()
 {
     _stackprofx.overall_samples++;
-    st_foreach(GET_THREAD()->vm->living_threads, stackprofx_record_sample_i, 0);
+    st_table *tbl = _stackprofx.threads ?: GET_THREAD()->vm->living_threads;
+    st_foreach(tbl, stackprofx_record_sample_i, 0);
 }
 
 static void
@@ -565,6 +587,7 @@ Init_stackprofx(void)
     S(object);
     S(custom);
     S(wall);
+    S(threads);
     S(cpu);
     S(name);
     S(file);
