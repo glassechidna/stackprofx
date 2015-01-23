@@ -1,6 +1,6 @@
 Gem::Specification.new do |s|
   s.name = 'stackprofx'
-  s.version = '0.2.8'
+  s.version = '0.2.9'
   s.homepage = 'https://github.com/glassechidna/stackprofx'
 
   s.authors = ['Aman Gupta', 'Aidan Steele']
