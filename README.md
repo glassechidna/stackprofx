@@ -11,3 +11,9 @@ I was considering calling it stackprof2, but 2 implies a successor to 1
 and this is in no way "better" than the original project.
 
 [1]: https://github.com/tmm1/stackprof
+
+### TODO
+
+* Investigate terrible hacks required to link against Ruby
+* Make stack deduplication (weights) useful again
+* Less mess
