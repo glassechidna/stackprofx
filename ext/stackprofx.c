@@ -170,7 +170,11 @@ stackprofx_stop(VALUE self)
 	return Qfalse;
     _stackprofx.running = 0;
 
-    st_free_table(_stackprofx.threads);
+    if (_stackprofx.threads)
+    {
+        st_free_table(_stackprofx.threads);
+        _stackprofx.threads = 0;
+    }
 
     if (_stackprofx.mode == sym_object) {
 	rb_tracepoint_disable(objtracer);
