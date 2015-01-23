@@ -10,7 +10,7 @@ Gem::Specification.new do |s|
   s.extensions = 'ext/extconf.rb'
 
   s.summary = 'fork of sampling callstack-profiler for ruby 2.1+'
-  s.description = 'stackprofx is a hacky derivative of stackprof, the sampling profiler for Ruby 2.+1.'
+  s.description = 'stackprofx is a hacky derivative of stackprof, the sampling profiler for Ruby 2.1+.'
 
   s.license = 'MIT'
 
