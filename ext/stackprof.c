@@ -15,6 +15,25 @@
 #include <sys/time.h>
 #include <pthread.h>
 
+#define ruby_current_thread ((rb_thread_t *)RTYPEDDATA_DATA(rb_thread_current()))
+
+#include "vm_core.h"
+#include "iseq.h"
+
+static inline const rb_data_type_t *
+threadptr_data_type(void)
+{
+  static const rb_data_type_t *thread_data_type;
+  if (!thread_data_type) {
+    VALUE current_thread = rb_thread_current();
+    thread_data_type = RTYPEDDATA_TYPE(current_thread);
+  }
+  return thread_data_type;
+}
+
+#define ruby_thread_data_type *threadptr_data_type()
+#define ruby_threadptr_data_type *threadptr_data_type()
+
 #define BUF_SIZE 2048
 
 typedef struct {

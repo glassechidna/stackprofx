@@ -904,7 +904,6 @@ int rb_autoloading_value(VALUE mod, ID id, VALUE* value);
 /* for thread */
 
 #if RUBY_VM_THREAD_MODEL == 2
-extern rb_thread_t *ruby_current_thread;
 extern rb_vm_t *ruby_current_vm;
 extern rb_event_flag_t ruby_vm_event_flags;
 
