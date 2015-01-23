@@ -1,7 +1,7 @@
 Gem::Specification.new do |s|
   s.name = 'stackprofx'
-  s.version = '0.2.7'
-  s.homepage = 'http://github.com/tmm1/stackprofx'
+  s.version = '0.2.8'
+  s.homepage = 'https://github.com/glassechidna/stackprofx'
 
   s.authors = ['Aman Gupta', 'Aidan Steele']
   s.email   = ['aman@tmm1.net', 'aidan.steele@glassechidna.com.au']
