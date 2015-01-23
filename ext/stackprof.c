@@ -358,14 +358,41 @@ st_numtable_increment(st_table *table, st_data_t key, size_t increment)
     st_update(table, key, numtable_increment_callback, (st_data_t)increment);
 }
 
-void
-stackprof_record_sample()
+// thanks to https://bugs.ruby-lang.org/issues/10602
+int
+rb_profile_frames_thread(int start, int limit, VALUE *buff, int *lines, rb_thread_t *th)
+{
+    int i;
+    rb_control_frame_t *cfp = th->cfp, *end_cfp = RUBY_VM_END_CONTROL_FRAME(th);
+
+    for (i=0; i<limit && cfp != end_cfp;) {
+	if (cfp->iseq && cfp->pc) { /* should be NORMAL_ISEQ */
+	    if (start > 0) {
+		start--;
+		continue;
+	    }
+
+	    /* record frame info */
+	    buff[i] = cfp->iseq->self;
+	    if (lines) lines[i] = rb_iseq_line_no(cfp->iseq, cfp->pc - cfp->iseq->iseq_encoded);
+	    i++;
+	}
+	cfp = RUBY_VM_PREVIOUS_CONTROL_FRAME(cfp);
+    }
+
+    return i;
+}
+
+int
+stackprof_record_sample_i(st_data_t key, st_data_t val, st_data_t arg)
 {
     int num, i, n;
     VALUE prev_frame = Qnil;
 
-    _stackprof.overall_samples++;
-    num = rb_profile_frames(0, sizeof(_stackprof.frames_buffer) / sizeof(VALUE), _stackprof.frames_buffer, _stackprof.lines_buffer);
+    rb_thread_t *th;
+    GetThreadPtr((VALUE)key, th);
+
+    num = rb_profile_frames_thread(0, sizeof(_stackprof.frames_buffer) / sizeof(VALUE), _stackprof.frames_buffer, _stackprof.lines_buffer, th);
 
     if (_stackprof.raw) {
 	int found = 0;
@@ -428,6 +455,15 @@ stackprof_record_sample()
 
 	prev_frame = frame;
     }
+
+    return ST_CONTINUE;
+}
+
+void
+stackprof_record_sample()
+{
+    _stackprof.overall_samples++;
+    st_foreach(GET_THREAD()->vm->living_threads, stackprof_record_sample_i, 0);
 }
 
 static void
