@@ -415,7 +415,7 @@ stackprofx_record_sample_i(st_data_t key, st_data_t val, st_data_t arg)
 
     rb_thread_t *th;
     GetThreadPtr((VALUE)key, th);
-    if (th->status == THREAD_KILLED) return ST_CONTINUE;
+    if (th->status != THREAD_RUNNABLE) return ST_CONTINUE;
 
     num = rb_profile_frames_thread(0, sizeof(_stackprofx.frames_buffer) / sizeof(VALUE), _stackprofx.frames_buffer, _stackprofx.lines_buffer, th);
 
