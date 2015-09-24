@@ -48,7 +48,6 @@ static struct
 {
     int running;
     int raw;
-    int aggregate;
 
     VALUE mode;
     VALUE interval;
@@ -72,7 +71,7 @@ static struct
 
 static VALUE sym_object, sym_wall, sym_cpu, sym_custom, sym_name, sym_file, sym_line, sym_threads;
 static VALUE sym_samples, sym_total_samples, sym_missed_samples, sym_lines;
-static VALUE sym_version, sym_mode, sym_interval, sym_raw, sym_frames, sym_out, sym_aggregate;
+static VALUE sym_version, sym_mode, sym_interval, sym_raw, sym_frames, sym_out;
 static VALUE sym_gc_samples, objtracer;
 static VALUE gc_hook;
 static VALUE rb_mStackProfx;
@@ -87,7 +86,7 @@ stackprofx_start(int argc, VALUE *argv, VALUE self)
     struct sigaction sa;
     struct itimerval timer;
     VALUE opts = Qnil, mode = Qnil, interval = Qnil, out = Qfalse, threads = Qnil;
-    int raw = 0, aggregate = 1;
+    int raw = 0;
 
     if (_stackprofx.running) return Qfalse;
 
@@ -101,7 +100,6 @@ stackprofx_start(int argc, VALUE *argv, VALUE self)
         threads = rb_hash_aref(opts, sym_threads);
 
         if (RTEST(rb_hash_aref(opts, sym_raw))) raw = 1;
-        if (rb_hash_lookup2(opts, sym_aggregate, Qundef) == Qfalse) aggregate = 0;
     }
     if (!RTEST(mode)) mode = sym_wall;
 
@@ -160,7 +158,6 @@ stackprofx_start(int argc, VALUE *argv, VALUE self)
 
     _stackprofx.running = 1;
     _stackprofx.raw = raw;
-    _stackprofx.aggregate = aggregate;
     _stackprofx.mode = mode;
     _stackprofx.interval = interval;
     _stackprofx.out = out;
@@ -499,7 +496,7 @@ stackprofx_record_sample_i(st_data_t key, st_data_t val, st_data_t arg)
 
         if (i == 0) frame_data->caller_samples++;
 
-        if (_stackprofx.aggregate && line > 0)
+        if (line > 0)
         {
             if (!frame_data->lines) frame_data->lines = st_init_numtable();
             size_t half = (size_t)1 << (8 * SIZEOF_SIZE_T / 2);
@@ -640,7 +637,6 @@ Init_stackprofx(void)
     S(raw);
     S(out);
     S(frames);
-    S(aggregate);
 #undef S
 
     gc_hook = Data_Wrap_Struct(rb_cObject, stackprofx_gc_mark, NULL, NULL);
