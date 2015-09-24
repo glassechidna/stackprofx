@@ -41,7 +41,6 @@ typedef struct
 {
     size_t total_samples;
     size_t caller_samples;
-    st_table *edges;
     st_table *lines;
 } frame_data_t;
 
@@ -72,7 +71,7 @@ static struct
 } _stackprofx;
 
 static VALUE sym_object, sym_wall, sym_cpu, sym_custom, sym_name, sym_file, sym_line, sym_threads;
-static VALUE sym_samples, sym_total_samples, sym_missed_samples, sym_edges, sym_lines;
+static VALUE sym_samples, sym_total_samples, sym_missed_samples, sym_lines;
 static VALUE sym_version, sym_mode, sym_interval, sym_raw, sym_frames, sym_out, sym_aggregate;
 static VALUE sym_gc_samples, objtracer;
 static VALUE gc_hook;
@@ -210,16 +209,6 @@ stackprofx_stop(VALUE self)
 }
 
 static int
-frame_edges_i(st_data_t key, st_data_t val, st_data_t arg)
-{
-    VALUE edges = (VALUE)arg;
-
-    intptr_t weight = (intptr_t)val;
-    rb_hash_aset(edges, rb_obj_id((VALUE)key), INT2FIX(weight));
-    return ST_CONTINUE;
-}
-
-static int
 frame_lines_i(st_data_t key, st_data_t val, st_data_t arg)
 {
     VALUE lines = (VALUE)arg;
@@ -239,7 +228,7 @@ frame_i(st_data_t key, st_data_t val, st_data_t arg)
     frame_data_t *frame_data = (frame_data_t *)val;
     VALUE results = (VALUE)arg;
     VALUE details = rb_hash_new();
-    VALUE name, file, edges, lines;
+    VALUE name, file, lines;
     VALUE line;
 
     rb_hash_aset(results, rb_obj_id(frame), details);
@@ -255,15 +244,6 @@ frame_i(st_data_t key, st_data_t val, st_data_t arg)
 
     rb_hash_aset(details, sym_total_samples, SIZET2NUM(frame_data->total_samples));
     rb_hash_aset(details, sym_samples, SIZET2NUM(frame_data->caller_samples));
-
-    if (frame_data->edges)
-    {
-        edges = rb_hash_new();
-        rb_hash_aset(details, sym_edges, edges);
-        st_foreach(frame_data->edges, frame_edges_i, (st_data_t)edges);
-        st_free_table(frame_data->edges);
-        frame_data->edges = NULL;
-    }
 
     if (frame_data->lines)
     {
@@ -517,15 +497,7 @@ stackprofx_record_sample_i(st_data_t key, st_data_t val, st_data_t arg)
 
         frame_data->total_samples++;
 
-        if (i == 0)
-        {
-            frame_data->caller_samples++;
-        }
-        else if (_stackprofx.aggregate)
-        {
-            if (!frame_data->edges) frame_data->edges = st_init_numtable();
-            st_numtable_increment(frame_data->edges, (st_data_t)prev_frame, 1);
-        }
+        if (i == 0) frame_data->caller_samples++;
 
         if (_stackprofx.aggregate && line > 0)
         {
@@ -661,7 +633,6 @@ Init_stackprofx(void)
     S(gc_samples);
     S(missed_samples);
     S(samples);
-    S(edges);
     S(lines);
     S(version);
     S(mode);
