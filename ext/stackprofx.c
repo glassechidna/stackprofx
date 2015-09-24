@@ -407,6 +407,38 @@ rb_profile_frames_thread(int start, int limit, VALUE *buff, int *lines, rb_threa
     return i;
 }
 
+void
+stackprofx_resize_raw_samples()
+{
+   	if (!_stackprofx.raw_samples) {
+   	    _stackprofx.raw_samples_capa = num * 100;
+   	    _stackprofx.raw_samples = malloc(sizeof(VALUE) * _stackprofx.raw_samples_capa);
+   	}
+
+   	if (_stackprofx.raw_samples_capa <= _stackprofx.raw_samples_len + num) {
+   	    _stackprofx.raw_samples_capa *= 2;
+   	    _stackprofx.raw_samples = realloc(_stackprofx.raw_samples, sizeof(VALUE) * _stackprofx.raw_samples_capa);
+   	}
+}
+
+int
+stackprofx_same_stackframe_as_prev()
+{
+    int num, i, n;
+
+    if (_stackprofx.raw_samples_len > 0 && _stackprofx.raw_samples[_stackprofx.raw_sample_index] == (VALUE)num)
+    {
+        for (i = num - 1, n = 0; i >= 0; i--, n++)
+        {
+          VALUE frame = _stackprofx.frames_buffer[i];
+          if (_stackprofx.raw_samples[_stackprofx.raw_sample_index + 1 + n] != frame) return 0;
+        }
+        if (i == -1) return 1;
+    }
+
+    return 0;
+}
+
 int
 stackprofx_record_sample_i(st_data_t key, st_data_t val, st_data_t arg)
 {
@@ -417,68 +449,63 @@ stackprofx_record_sample_i(st_data_t key, st_data_t val, st_data_t arg)
     GetThreadPtr((VALUE)key, th);
     if (th->status != THREAD_RUNNABLE) return ST_CONTINUE;
 
-    num = rb_profile_frames_thread(0, sizeof(_stackprofx.frames_buffer) / sizeof(VALUE), _stackprofx.frames_buffer, _stackprofx.lines_buffer, th);
+    num = rb_profile_frames_thread(
+      0,
+      sizeof(_stackprofx.frames_buffer) / sizeof(VALUE),
+      _stackprofx.frames_buffer,
+      _stackprofx.lines_buffer,
+      th
+    );
 
-    if (_stackprofx.raw) {
-	int found = 0;
+    if (_stackprofx.raw)
+    {
+        stackprofx_resize_raw_samples();
 
-	if (!_stackprofx.raw_samples) {
-	    _stackprofx.raw_samples_capa = num * 100;
-	    _stackprofx.raw_samples = malloc(sizeof(VALUE) * _stackprofx.raw_samples_capa);
-	}
+        if (stackprofx_same_stackframe_as_prev())
+        {
+            _stackprofx.raw_samples[_stackprofx.raw_samples_len-1] += 1;
+        }
+        else
+        {
+            _stackprofx.raw_sample_index = _stackprofx.raw_samples_len;
+            _stackprofx.raw_samples[_stackprofx.raw_samples_len++] = (VALUE)num;
+            for (i = num-1; i >= 0; i--)
+            {
+                VALUE frame = _stackprofx.frames_buffer[i];
+                _stackprofx.raw_samples[_stackprofx.raw_samples_len++] = frame;
+            }
+            _stackprofx.raw_samples[_stackprofx.raw_samples_len++] = (VALUE)1;
+        }
 
-	if (_stackprofx.raw_samples_capa <= _stackprofx.raw_samples_len + num) {
-	    _stackprofx.raw_samples_capa *= 2;
-	    _stackprofx.raw_samples = realloc(_stackprofx.raw_samples, sizeof(VALUE) * _stackprofx.raw_samples_capa);
-	}
-
-	if (_stackprofx.raw_samples_len > 0 && _stackprofx.raw_samples[_stackprofx.raw_sample_index] == (VALUE)num) {
-	    for (i = num-1, n = 0; i >= 0; i--, n++) {
-		VALUE frame = _stackprofx.frames_buffer[i];
-		if (_stackprofx.raw_samples[_stackprofx.raw_sample_index + 1 + n] != frame)
-		    break;
-	    }
-	    if (i == -1) {
-		_stackprofx.raw_samples[_stackprofx.raw_samples_len-1] += 1;
-		found = 1;
-	    }
-	}
-
-	if (!found) {
-	    _stackprofx.raw_sample_index = _stackprofx.raw_samples_len;
-	    _stackprofx.raw_samples[_stackprofx.raw_samples_len++] = (VALUE)num;
-	    for (i = num-1; i >= 0; i--) {
-		VALUE frame = _stackprofx.frames_buffer[i];
-		_stackprofx.raw_samples[_stackprofx.raw_samples_len++] = frame;
-	    }
-	    _stackprofx.raw_samples[_stackprofx.raw_samples_len++] = (VALUE)1;
-	}
     }
 
-    for (i = 0; i < num; i++) {
-	int line = _stackprofx.lines_buffer[i];
-	VALUE frame = _stackprofx.frames_buffer[i];
-	frame_data_t *frame_data = sample_for(frame);
+    for (i = 0; i < num; i++)
+    {
+        int line = _stackprofx.lines_buffer[i];
+        VALUE frame = _stackprofx.frames_buffer[i];
+        frame_data_t *frame_data = sample_for(frame);
 
-	frame_data->total_samples++;
+        frame_data->total_samples++;
 
-	if (i == 0) {
-	    frame_data->caller_samples++;
-	} else if (_stackprofx.aggregate) {
-	    if (!frame_data->edges)
-		frame_data->edges = st_init_numtable();
-	    st_numtable_increment(frame_data->edges, (st_data_t)prev_frame, 1);
-	}
+        if (i == 0)
+        {
+            frame_data->caller_samples++;
+        }
+        else if (_stackprofx.aggregate)
+        {
+            if (!frame_data->edges) frame_data->edges = st_init_numtable();
+            st_numtable_increment(frame_data->edges, (st_data_t)prev_frame, 1);
+        }
 
-	if (_stackprofx.aggregate && line > 0) {
-	    if (!frame_data->lines)
-		frame_data->lines = st_init_numtable();
-	    size_t half = (size_t)1<<(8*SIZEOF_SIZE_T/2);
-	    size_t increment = i == 0 ? half + 1 : half;
-	    st_numtable_increment(frame_data->lines, (st_data_t)line, increment);
-	}
+        if (_stackprofx.aggregate && line > 0)
+        {
+            if (!frame_data->lines) frame_data->lines = st_init_numtable();
+            size_t half = (size_t)1<<(8*SIZEOF_SIZE_T/2);
+            size_t increment = i == 0 ? half + 1 : half;
+            st_numtable_increment(frame_data->lines, (st_data_t)line, increment);
+        }
 
-	prev_frame = frame;
+        prev_frame = frame;
     }
 
     return ST_CONTINUE;
