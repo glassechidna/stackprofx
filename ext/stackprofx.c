@@ -436,7 +436,7 @@ rb_profile_frames_thread(int start, int limit, VALUE *buff, int *lines, rb_threa
 }
 
 void
-stackprofx_resize_raw_samples()
+stackprofx_resize_raw_samples(int num)
 {
     if (!_stackprofx.raw_samples)
     {
@@ -452,9 +452,9 @@ stackprofx_resize_raw_samples()
 }
 
 int
-stackprofx_same_stackframe_as_prev()
+stackprofx_same_stackframe_as_prev(int num)
 {
-    int num, i, n;
+    int i, n;
 
     if (_stackprofx.raw_samples_len > 0 && _stackprofx.raw_samples[_stackprofx.raw_sample_index] == (VALUE)num)
     {
@@ -489,9 +489,9 @@ stackprofx_record_sample_i(st_data_t key, st_data_t val, st_data_t arg)
 
     if (_stackprofx.raw)
     {
-        stackprofx_resize_raw_samples();
+        stackprofx_resize_raw_samples(num);
 
-        if (stackprofx_same_stackframe_as_prev())
+        if (stackprofx_same_stackframe_as_prev(num))
         {
             _stackprofx.raw_samples[_stackprofx.raw_samples_len - 1] += 1;
         }
