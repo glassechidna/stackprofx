@@ -44,7 +44,7 @@ typedef struct
     st_table *lines;
 } frame_data_t;
 
-static struct
+typedef struct
 {
     int running;
 
@@ -65,7 +65,9 @@ static struct
 
     VALUE frames_buffer[BUF_SIZE];
     int lines_buffer[BUF_SIZE];
-} _stackprofx;
+} stackprofx_t;
+
+static stackprofx_t _stackprofx;
 
 static VALUE sym_object, sym_wall, sym_cpu, sym_custom, sym_name, sym_file, sym_line, sym_threads;
 static VALUE sym_samples, sym_total_samples, sym_missed_samples, sym_lines;
