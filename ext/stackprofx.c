@@ -50,7 +50,6 @@ static struct
 
     VALUE mode;
     VALUE interval;
-    VALUE out;
 
     VALUE *raw_samples;
     size_t raw_samples_len;
@@ -70,7 +69,7 @@ static struct
 
 static VALUE sym_object, sym_wall, sym_cpu, sym_custom, sym_name, sym_file, sym_line, sym_threads;
 static VALUE sym_samples, sym_total_samples, sym_missed_samples, sym_lines;
-static VALUE sym_version, sym_mode, sym_interval, sym_raw, sym_frames, sym_out;
+static VALUE sym_version, sym_mode, sym_interval, sym_raw, sym_frames;
 static VALUE sym_gc_samples, objtracer;
 static VALUE gc_hook;
 static VALUE rb_mStackProfx;
@@ -84,7 +83,7 @@ stackprofx_start(int argc, VALUE *argv, VALUE self)
 {
     struct sigaction sa;
     struct itimerval timer;
-    VALUE opts = Qnil, mode = Qnil, interval = Qnil, out = Qfalse, threads = Qnil;
+    VALUE opts = Qnil, mode = Qnil, interval = Qnil, threads = Qnil;
 
     if (_stackprofx.running) return Qfalse;
 
@@ -94,7 +93,6 @@ stackprofx_start(int argc, VALUE *argv, VALUE self)
     {
         mode = rb_hash_aref(opts, sym_mode);
         interval = rb_hash_aref(opts, sym_interval);
-        out = rb_hash_aref(opts, sym_out);
         threads = rb_hash_aref(opts, sym_threads);
     }
     if (!RTEST(mode)) mode = sym_wall;
@@ -155,7 +153,6 @@ stackprofx_start(int argc, VALUE *argv, VALUE self)
     _stackprofx.running = 1;
     _stackprofx.mode = mode;
     _stackprofx.interval = interval;
-    _stackprofx.out = out;
 
     return Qtrue;
 }
@@ -251,7 +248,7 @@ frame_i(st_data_t key, st_data_t val, st_data_t arg)
 }
 
 static VALUE
-stackprofx_results(int argc, VALUE *argv, VALUE self)
+stackprofx_results(VALUE self)
 {
     VALUE results, frames;
 
@@ -296,26 +293,7 @@ stackprofx_results(int argc, VALUE *argv, VALUE self)
         rb_hash_aset(results, sym_raw, raw_samples);
     }
 
-    if (argc == 1) _stackprofx.out = argv[0];
-
-    if (RTEST(_stackprofx.out))
-    {
-        VALUE file;
-        if (RB_TYPE_P(_stackprofx.out, T_STRING))
-        {
-            file = rb_file_open_str(_stackprofx.out, "w");
-        } else
-        {
-            file = rb_io_check_io(_stackprofx.out);
-        }
-        rb_marshal_dump(results, file);
-        rb_io_flush(file);
-        _stackprofx.out = Qnil;
-        return file;
-    } else
-    {
-        return results;
-    }
+    return results;
 }
 
 static VALUE
@@ -324,7 +302,7 @@ stackprofx_run(int argc, VALUE *argv, VALUE self)
     rb_need_block();
     stackprofx_start(argc, argv, self);
     rb_ensure(rb_yield, Qundef, stackprofx_stop, self);
-    return stackprofx_results(0, 0, self);
+    return stackprofx_results(self);
 }
 
 static VALUE
@@ -563,8 +541,6 @@ frame_mark_i(st_data_t key, st_data_t val, st_data_t arg)
 static void
 stackprofx_gc_mark(void *data)
 {
-    if (RTEST(_stackprofx.out)) rb_gc_mark(_stackprofx.out);
-
     if (_stackprofx.frames) st_foreach(_stackprofx.frames, frame_mark_i, 0);
 }
 
@@ -624,7 +600,6 @@ Init_stackprofx(void)
     S(version);
     S(mode);
     S(interval);
-    S(out);
     S(frames);
 #undef S
 
@@ -636,7 +611,7 @@ Init_stackprofx(void)
     rb_define_singleton_method(rb_mStackProfx, "run", stackprofx_run, -1);
     rb_define_singleton_method(rb_mStackProfx, "start", stackprofx_start, -1);
     rb_define_singleton_method(rb_mStackProfx, "stop", stackprofx_stop, 0);
-    rb_define_singleton_method(rb_mStackProfx, "results", stackprofx_results, -1);
+    rb_define_singleton_method(rb_mStackProfx, "results", stackprofx_results, 0);
     rb_define_singleton_method(rb_mStackProfx, "sample", stackprofx_sample, 0);
 
     pthread_atfork(stackprofx_atfork_prepare, stackprofx_atfork_parent, stackprofx_atfork_child);
