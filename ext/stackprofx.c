@@ -47,7 +47,6 @@ typedef struct
 static struct
 {
     int running;
-    int raw;
 
     VALUE mode;
     VALUE interval;
@@ -86,7 +85,6 @@ stackprofx_start(int argc, VALUE *argv, VALUE self)
     struct sigaction sa;
     struct itimerval timer;
     VALUE opts = Qnil, mode = Qnil, interval = Qnil, out = Qfalse, threads = Qnil;
-    int raw = 0;
 
     if (_stackprofx.running) return Qfalse;
 
@@ -98,8 +96,6 @@ stackprofx_start(int argc, VALUE *argv, VALUE self)
         interval = rb_hash_aref(opts, sym_interval);
         out = rb_hash_aref(opts, sym_out);
         threads = rb_hash_aref(opts, sym_threads);
-
-        if (RTEST(rb_hash_aref(opts, sym_raw))) raw = 1;
     }
     if (!RTEST(mode)) mode = sym_wall;
 
@@ -157,7 +153,6 @@ stackprofx_start(int argc, VALUE *argv, VALUE self)
     }
 
     _stackprofx.running = 1;
-    _stackprofx.raw = raw;
     _stackprofx.mode = mode;
     _stackprofx.interval = interval;
     _stackprofx.out = out;
@@ -277,7 +272,7 @@ stackprofx_results(int argc, VALUE *argv, VALUE self)
     st_free_table(_stackprofx.frames);
     _stackprofx.frames = NULL;
 
-    if (_stackprofx.raw && _stackprofx.raw_samples_len)
+    if (_stackprofx.raw_samples_len > 0)
     {
         size_t len, n, o;
         VALUE raw_samples = rb_ary_new_capa(_stackprofx.raw_samples_len);
@@ -297,7 +292,6 @@ stackprofx_results(int argc, VALUE *argv, VALUE self)
         _stackprofx.raw_samples_len = 0;
         _stackprofx.raw_samples_capa = 0;
         _stackprofx.raw_sample_index = 0;
-        _stackprofx.raw = 0;
 
         rb_hash_aset(results, sym_raw, raw_samples);
     }
@@ -464,26 +458,22 @@ stackprofx_record_sample_i(st_data_t key, st_data_t val, st_data_t arg)
         th
     );
 
-    if (_stackprofx.raw)
+    stackprofx_resize_raw_samples(num);
+
+    if (stackprofx_same_stackframe_as_prev(num))
     {
-        stackprofx_resize_raw_samples(num);
-
-        if (stackprofx_same_stackframe_as_prev(num))
+        _stackprofx.raw_samples[_stackprofx.raw_samples_len - 1] += 1;
+    }
+    else
+    {
+        _stackprofx.raw_sample_index = _stackprofx.raw_samples_len;
+        _stackprofx.raw_samples[_stackprofx.raw_samples_len++] = (VALUE)num;
+        for (i = num - 1; i >= 0; i--)
         {
-            _stackprofx.raw_samples[_stackprofx.raw_samples_len - 1] += 1;
+            VALUE frame = _stackprofx.frames_buffer[i];
+            _stackprofx.raw_samples[_stackprofx.raw_samples_len++] = frame;
         }
-        else
-        {
-            _stackprofx.raw_sample_index = _stackprofx.raw_samples_len;
-            _stackprofx.raw_samples[_stackprofx.raw_samples_len++] = (VALUE)num;
-            for (i = num - 1; i >= 0; i--)
-            {
-                VALUE frame = _stackprofx.frames_buffer[i];
-                _stackprofx.raw_samples[_stackprofx.raw_samples_len++] = frame;
-            }
-            _stackprofx.raw_samples[_stackprofx.raw_samples_len++] = (VALUE)1;
-        }
-
+        _stackprofx.raw_samples[_stackprofx.raw_samples_len++] = (VALUE)1;
     }
 
     for (i = 0; i < num; i++)
@@ -634,7 +624,6 @@ Init_stackprofx(void)
     S(version);
     S(mode);
     S(interval);
-    S(raw);
     S(out);
     S(frames);
 #undef S
