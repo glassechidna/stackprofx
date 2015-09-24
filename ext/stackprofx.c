@@ -90,8 +90,7 @@ stackprofx_start(int argc, VALUE *argv, VALUE self)
     VALUE opts = Qnil, mode = Qnil, interval = Qnil, out = Qfalse, threads = Qnil;
     int raw = 0, aggregate = 1;
 
-    if (_stackprofx.running)
-        return Qfalse;
+    if (_stackprofx.running) return Qfalse;
 
     rb_scan_args(argc, argv, "0:", &opts);
 
@@ -102,10 +101,8 @@ stackprofx_start(int argc, VALUE *argv, VALUE self)
         out = rb_hash_aref(opts, sym_out);
         threads = rb_hash_aref(opts, sym_threads);
 
-        if (RTEST(rb_hash_aref(opts, sym_raw)))
-            raw = 1;
-        if (rb_hash_lookup2(opts, sym_aggregate, Qundef) == Qfalse)
-            aggregate = 0;
+        if (RTEST(rb_hash_aref(opts, sym_raw))) raw = 1;
+        if (rb_hash_lookup2(opts, sym_aggregate, Qundef) == Qfalse) aggregate = 0;
     }
     if (!RTEST(mode)) mode = sym_wall;
 
@@ -138,7 +135,8 @@ stackprofx_start(int argc, VALUE *argv, VALUE self)
 
         objtracer = rb_tracepoint_new(Qnil, RUBY_INTERNAL_EVENT_NEWOBJ, stackprofx_newobj_handler, 0);
         rb_tracepoint_enable(objtracer);
-    } else if (mode == sym_wall || mode == sym_cpu)
+    }
+    else if (mode == sym_wall || mode == sym_cpu)
     {
         if (!RTEST(interval)) interval = INT2FIX(1000);
 
@@ -151,7 +149,8 @@ stackprofx_start(int argc, VALUE *argv, VALUE self)
         timer.it_interval.tv_usec = NUM2LONG(interval);
         timer.it_value = timer.it_interval;
         setitimer(mode == sym_wall ? ITIMER_REAL : ITIMER_PROF, &timer, 0);
-    } else if (mode == sym_custom)
+    }
+    else if (mode == sym_custom)
     {
         /* sampled manually */
         interval = Qnil;
@@ -176,8 +175,7 @@ stackprofx_stop(VALUE self)
     struct sigaction sa;
     struct itimerval timer;
 
-    if (!_stackprofx.running)
-        return Qfalse;
+    if (!_stackprofx.running) return Qfalse;
     _stackprofx.running = 0;
 
     if (_stackprofx.threads)
@@ -189,7 +187,8 @@ stackprofx_stop(VALUE self)
     if (_stackprofx.mode == sym_object)
     {
         rb_tracepoint_disable(objtracer);
-    } else if (_stackprofx.mode == sym_wall || _stackprofx.mode == sym_cpu)
+    }
+    else if (_stackprofx.mode == sym_wall || _stackprofx.mode == sym_cpu)
     {
         memset(&timer, 0, sizeof(timer));
         setitimer(_stackprofx.mode == sym_wall ? ITIMER_REAL : ITIMER_PROF, &timer, 0);
@@ -198,7 +197,8 @@ stackprofx_stop(VALUE self)
         sa.sa_flags = SA_RESTART;
         sigemptyset(&sa.sa_mask);
         sigaction(_stackprofx.mode == sym_wall ? SIGALRM : SIGPROF, &sa, NULL);
-    } else if (_stackprofx.mode == sym_custom)
+    }
+    else if (_stackprofx.mode == sym_custom)
     {
         /* sampled manually */
     } else
@@ -248,12 +248,10 @@ frame_i(st_data_t key, st_data_t val, st_data_t arg)
     rb_hash_aset(details, sym_name, name);
 
     file = rb_profile_frame_absolute_path(frame);
-    if (NIL_P(file))
-        file = rb_profile_frame_path(frame);
+    if (NIL_P(file)) file = rb_profile_frame_path(frame);
     rb_hash_aset(details, sym_file, file);
 
-    if ((line = rb_profile_frame_first_lineno(frame)) != INT2FIX(0))
-        rb_hash_aset(details, sym_line, line);
+    if ((line = rb_profile_frame_first_lineno(frame)) != INT2FIX(0)) rb_hash_aset(details, sym_line, line);
 
     rb_hash_aset(details, sym_total_samples, SIZET2NUM(frame_data->total_samples));
     rb_hash_aset(details, sym_samples, SIZET2NUM(frame_data->caller_samples));
@@ -285,8 +283,7 @@ stackprofx_results(int argc, VALUE *argv, VALUE self)
 {
     VALUE results, frames;
 
-    if (!_stackprofx.frames || _stackprofx.running)
-        return Qnil;
+    if (!_stackprofx.frames || _stackprofx.running) return Qnil;
 
     results = rb_hash_new();
     rb_hash_aset(results, sym_version, DBL2NUM(1.1));
@@ -328,8 +325,7 @@ stackprofx_results(int argc, VALUE *argv, VALUE self)
         rb_hash_aset(results, sym_raw, raw_samples);
     }
 
-    if (argc == 1)
-        _stackprofx.out = argv[0];
+    if (argc == 1) _stackprofx.out = argv[0];
 
     if (RTEST(_stackprofx.out))
     {
@@ -375,7 +371,8 @@ sample_for(VALUE frame)
     if (st_lookup(_stackprofx.frames, key, &val))
     {
         frame_data = (frame_data_t *)val;
-    } else
+    }
+    else
     {
         frame_data = ALLOC_N(frame_data_t, 1);
         MEMZERO(frame_data, frame_data_t, 1);
@@ -393,9 +390,13 @@ numtable_increment_callback(st_data_t *key, st_data_t *value, st_data_t arg, int
     size_t increment = (size_t)arg;
 
     if (existing)
+    {
         (*weight) += increment;
+    }
     else
+    {
         *weight = increment;
+    }
 
     return ST_CONTINUE;
 }
@@ -565,25 +566,27 @@ stackprofx_signal_handler(int sig, siginfo_t *sinfo, void *ucontext)
 {
     _stackprofx.overall_signals++;
     if (rb_during_gc())
+    {
         _stackprofx.during_gc++, _stackprofx.overall_samples++;
+    }
     else
+    {
         rb_postponed_job_register_one(0, stackprofx_job_handler, 0);
+    }
 }
 
 static void
 stackprofx_newobj_handler(VALUE tpval, void *data)
 {
     _stackprofx.overall_signals++;
-    if (RTEST(_stackprofx.interval) && _stackprofx.overall_signals % NUM2LONG(_stackprofx.interval))
-        return;
+    if (RTEST(_stackprofx.interval) && _stackprofx.overall_signals % NUM2LONG(_stackprofx.interval)) return;
     stackprofx_job_handler(0);
 }
 
 static VALUE
 stackprofx_sample(VALUE self)
 {
-    if (!_stackprofx.running)
-        return Qfalse;
+    if (!_stackprofx.running) return Qfalse;
 
     _stackprofx.overall_signals++;
     stackprofx_job_handler(0);
@@ -601,11 +604,9 @@ frame_mark_i(st_data_t key, st_data_t val, st_data_t arg)
 static void
 stackprofx_gc_mark(void *data)
 {
-    if (RTEST(_stackprofx.out))
-        rb_gc_mark(_stackprofx.out);
+    if (RTEST(_stackprofx.out)) rb_gc_mark(_stackprofx.out);
 
-    if (_stackprofx.frames)
-        st_foreach(_stackprofx.frames, frame_mark_i, 0);
+    if (_stackprofx.frames) st_foreach(_stackprofx.frames, frame_mark_i, 0);
 }
 
 static void
