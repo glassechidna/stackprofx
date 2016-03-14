@@ -611,7 +611,7 @@ Init_stackprofx(void)
     S(aggregate);
 #undef S
 
-    gc_hook = Data_Wrap_Struct(rb_cObject, stackprofx_gc_mark, NULL, NULL);
+    gc_hook = Data_Wrap_Struct(rb_cObject, stackprofx_gc_mark, NULL, &_stackprofx);
     rb_global_variable(&gc_hook);
 
     rb_mStackProfx = rb_define_module("StackProfx");
